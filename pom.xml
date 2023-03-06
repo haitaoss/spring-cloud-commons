@@ -170,5 +170,6 @@
 		<module>spring-cloud-starter-bootstrap</module>
 		<module>spring-cloud-starter-loadbalancer</module>
 		<module>docs</module>
+		<module>source-note-spring-cloud-commons</module>
 	</modules>
 </project>
