@@ -38,15 +38,24 @@ public class EnableDiscoveryClientImportSelector extends SpringFactoryImportSele
 
 	@Override
 	public String[] selectImports(AnnotationMetadata metadata) {
+		/**
+		 * 读取 META-INF/spring.factories 中 key 是 `EnableDiscoveryClient.class.getName()` 的类信息
+		 * */
 		String[] imports = super.selectImports(metadata);
 
 		AnnotationAttributes attributes = AnnotationAttributes
 				.fromMap(metadata.getAnnotationAttributes(getAnnotationClass().getName(), true));
 
+		// 注解的值是 true
 		boolean autoRegister = attributes.getBoolean("autoRegister");
 
 		if (autoRegister) {
 			List<String> importsList = new ArrayList<>(Arrays.asList(imports));
+			/**
+			 * 添加 AutoServiceRegistrationConfiguration 这个类，
+			 * 这个类的目的很简单，就是注册 AutoServiceRegistrationProperties 到BeanFactory中
+			 * 		@EnableConfigurationProperties(AutoServiceRegistrationProperties.class)
+			 * */
 			importsList.add("org.springframework.cloud.client.serviceregistry.AutoServiceRegistrationConfiguration");
 			imports = importsList.toArray(new String[0]);
 		}

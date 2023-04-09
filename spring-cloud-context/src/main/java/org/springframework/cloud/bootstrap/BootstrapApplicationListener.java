@@ -16,17 +16,6 @@
 
 package org.springframework.cloud.bootstrap;
 
-import java.lang.reflect.Field;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
 import org.springframework.beans.factory.ListableBeanFactory;
 import org.springframework.boot.Banner.Mode;
 import org.springframework.boot.SpringApplication;
@@ -50,17 +39,14 @@ import org.springframework.context.event.SmartApplicationListener;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.AnnotationAwareOrderComparator;
 import org.springframework.core.annotation.Order;
-import org.springframework.core.env.CompositePropertySource;
-import org.springframework.core.env.ConfigurableEnvironment;
-import org.springframework.core.env.MapPropertySource;
-import org.springframework.core.env.MutablePropertySources;
-import org.springframework.core.env.PropertySource;
+import org.springframework.core.env.*;
 import org.springframework.core.env.PropertySource.StubPropertySource;
-import org.springframework.core.env.StandardEnvironment;
-import org.springframework.core.env.SystemEnvironmentPropertySource;
 import org.springframework.core.io.ResourceLoader;
 import org.springframework.util.ReflectionUtils;
 import org.springframework.util.StringUtils;
+
+import java.lang.reflect.Field;
+import java.util.*;
 
 import static org.springframework.cloud.util.PropertyUtils.bootstrapEnabled;
 import static org.springframework.cloud.util.PropertyUtils.useLegacyProcessing;
@@ -125,14 +111,29 @@ public class BootstrapApplicationListener implements ApplicationListener<Applica
         }
         if (context == null) {
             /**
+             * 构造出 bootstrap context，完成引导属性、引导配置类 的加载
+             *
              * 1. 构造一个 Environment，主要是设置这三个属性
-             *      spring.config.name : 默认就是 bootstrap
-             *      spring.config.location
-             *      spring.config.additional-location
+             *      由 ${spring.cloud.bootstrap.name:bootstrap}       设置  spring.config.name                  属性的值
+             *      由 ${spring.cloud.bootstrap.location}             设置  spring.config.location              属性的值
+             *      由 ${spring.cloud.bootstrap.additional-location}  设置  spring.config.additional-location   属性的值
              *
-             * 2. 使用 SpringBoot 构造出 Context，说白了就是利用 SpringBoot 加载 application.yml 的逻辑来加载 bootstrap.yml
+             * 2. 配置 SpringApplicationBuilder
+             *      - 将上面构造的 Environment 设置给 SpringApplicationBuilder
+             *      - 设置 BootstrapImportSelectorConfiguration 作为起源配置类，这个类的作用是 读取 META-INF/spring.factories 文件
+             *          获取key为`BootstrapConfiguration.class.getName()`的值 和 属性 spring.cloud.bootstrap.sources 的值作为配置类导入到 BeanFactory 中
              *
-             * 3. 将 context 中的 Environment 追加到 event.getSpringApplication() 中，从而实现 bootstrap.properties 文件的加载
+             *      `SpringApplicationBuilder builder = new SpringApplicationBuilder()
+             *                 .environment(bootstrapEnvironment)
+             *                 .sources(BootstrapImportSelectorConfiguration.class);`
+             *
+             * 3. 使用 SpringApplicationBuilder 构造出 Context，说白了就是利用 SpringBoot 加载 application.yml 的逻辑来加载 bootstrap.yml
+             *      `ConfigurableApplicationContext bootstrapContext = builder.run();`
+             *
+             * 4. 添加一个 AncestorInitializer , 其作用是设置 bootstrap 作为 application 的父容器
+             *      event.getSpringApplication().addInitializers(new AncestorInitializer(bootstrapContext));
+             *
+             * 5. 将 bootstrap context 中的 Environment 追加到 event.getSpringApplication() 中，从而将 bootstrap.properties 属性内容 扩展到 event.getSpringApplication() 中
              *
              * Tips：就是SpringBoot的知识，懂的自然懂
              * */
@@ -144,9 +145,12 @@ public class BootstrapApplicationListener implements ApplicationListener<Applica
 
         /**
          * 1. 添加 BootstrapMarkerConfiguration 用来标记已经处理过了
-         * 2. 将 context 中的 ApplicationContextInitializer 追加到 event.getSpringApplication() 中
+         * 2. 将 bootstrap context 中的 ApplicationContextInitializer 追加到 event.getSpringApplication() 中
+         *      Tips：
+         *          - 有一个 PropertySourceBootstrapConfiguration ,这个是用来实现远程属性文件的读取和更新的
+         *          - 有一个 AncestorInitializer , 其作用是设置 bootstrap 作为 application 的父容器
          *
-         * Tips：可以将 event.getSpringApplication() 理解成主容器，context 理解成临时容器。
+         * Tips：可以将 event.getSpringApplication() 理解成子容器，bootstrap context 理解成父容器
          * */
         apply(context, event.getSpringApplication(), environment);
     }
@@ -242,6 +246,9 @@ public class BootstrapApplicationListener implements ApplicationListener<Applica
             // way to switch those off.
             builderApplication.setListeners(filterListeners(builderApplication.getListeners()));
         }
+        /**
+         * 核心目的就是指定 builder 这个容器的配置类是啥，从而使这些类生效
+         * */
         builder.sources(BootstrapImportSelectorConfiguration.class);
         /**
          * 启动 SpringBoot
@@ -252,6 +259,9 @@ public class BootstrapApplicationListener implements ApplicationListener<Applica
         // spring.application.name
         // during the bootstrap phase.
         context.setId("bootstrap");
+        /**
+         * 添加一个 AncestorInitializer , 其作用是设置 bootstrap 作为 application 的父容器
+         * */
         // Make the bootstrap context a parent of the app context
         addAncestorInitializer(application, context);
         // 移除临时属性
@@ -343,6 +353,9 @@ public class BootstrapApplicationListener implements ApplicationListener<Applica
             }
         }
         if (!installed) {
+            /**
+             * AncestorInitializer 的目的是给 application 设置 parentContext
+             * */
             application.addInitializers(new AncestorInitializer(context));
         }
 

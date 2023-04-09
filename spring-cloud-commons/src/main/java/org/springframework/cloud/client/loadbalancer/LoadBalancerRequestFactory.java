@@ -16,11 +16,12 @@
 
 package org.springframework.cloud.client.loadbalancer;
 
-import java.util.List;
-
 import org.springframework.http.HttpRequest;
 import org.springframework.http.client.ClientHttpRequestExecution;
 import org.springframework.http.client.ClientHttpResponse;
+import org.springframework.http.client.InterceptingClientHttpRequest;
+
+import java.util.List;
 
 /**
  * Creates {@link LoadBalancerRequest}s for {@link LoadBalancerInterceptor} and
@@ -49,12 +50,18 @@ public class LoadBalancerRequestFactory {
 	public LoadBalancerRequest<ClientHttpResponse> createRequest(final HttpRequest request, final byte[] body,
 			final ClientHttpRequestExecution execution) {
 		return instance -> {
+			// 装饰一下，其目的是会根据 instance 生成 uri
 			HttpRequest serviceRequest = new ServiceRequestWrapper(request, instance, this.loadBalancer);
 			if (this.transformers != null) {
 				for (LoadBalancerRequestTransformer transformer : this.transformers) {
+					// 对请求进行加工
 					serviceRequest = transformer.transformRequest(serviceRequest, instance);
 				}
 			}
+			/**
+			 * 放行请求
+			 * {@link InterceptingClientHttpRequest.InterceptingRequestExecution#execute(HttpRequest, byte[])}
+			 * */
 			return execution.execute(serviceRequest, body);
 		};
 	}

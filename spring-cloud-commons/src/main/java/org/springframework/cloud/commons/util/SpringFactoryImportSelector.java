@@ -16,13 +16,8 @@
 
 package org.springframework.cloud.commons.util;
 
-import java.util.ArrayList;
-import java.util.LinkedHashSet;
-import java.util.List;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-
 import org.springframework.beans.factory.BeanClassLoaderAware;
 import org.springframework.context.EnvironmentAware;
 import org.springframework.context.annotation.DeferredImportSelector;
@@ -32,6 +27,10 @@ import org.springframework.core.env.Environment;
 import org.springframework.core.io.support.SpringFactoriesLoader;
 import org.springframework.core.type.AnnotationMetadata;
 import org.springframework.util.Assert;
+
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
 
 /**
  * Selects configurations to load, defined by the generic type T. Loads implementations
@@ -54,6 +53,7 @@ public abstract class SpringFactoryImportSelector<T>
 
 	@SuppressWarnings("unchecked")
 	protected SpringFactoryImportSelector() {
+		// 获取 SpringFactoryImportSelector 上泛型标注的类
 		this.annotationClass = (Class<T>) GenericTypeResolver.resolveTypeArgument(this.getClass(),
 				SpringFactoryImportSelector.class);
 	}
@@ -63,12 +63,16 @@ public abstract class SpringFactoryImportSelector<T>
 		if (!isEnabled()) {
 			return new String[0];
 		}
+		// 其实就是得有 注解
 		AnnotationAttributes attributes = AnnotationAttributes
 				.fromMap(metadata.getAnnotationAttributes(this.annotationClass.getName(), true));
 
 		Assert.notNull(attributes, "No " + getSimpleName() + " attributes found. Is " + metadata.getClassName()
 				+ " annotated with @" + getSimpleName() + "?");
 
+		/**
+		 * 读取 META-INF/spring.factories 中 key 是 annotationClass
+		 * */
 		// Find all possible auto configuration classes, filtering duplicates
 		List<String> factories = new ArrayList<>(new LinkedHashSet<>(
 				SpringFactoriesLoader.loadFactoryNames(this.annotationClass, this.beanClassLoader)));

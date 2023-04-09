@@ -69,7 +69,9 @@ public class ConfigurationPropertiesRebinderAutoConfiguration
 			// TODO: make this optional? (E.g. when creating child contexts that prefer to
 			// be isolated.)
 			ConfigurationPropertiesRebinder rebinder = this.context.getBean(ConfigurationPropertiesRebinder.class);
+			// 遍历 父容器中的 bean
 			for (String name : this.context.getParent().getBeanDefinitionNames()) {
+				// 对 bean 进行重新绑定
 				rebinder.rebind(name);
 			}
 		}

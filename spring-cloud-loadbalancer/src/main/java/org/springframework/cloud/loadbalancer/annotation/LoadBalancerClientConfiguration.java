@@ -57,6 +57,13 @@ public class LoadBalancerClientConfiguration {
 
 	private static final int REACTIVE_SERVICE_INSTANCE_SUPPLIER_ORDER = 193827465;
 
+	/**
+	 * 反应式负载均衡器。其依赖 ServiceInstanceListSupplier
+	 * 设置了 @ConditionalOnMissingBean 条件，若想自定义可以往容器中配置这个类型的bean
+	 * @param environment
+	 * @param loadBalancerClientFactory
+	 * @return
+	 */
 	@Bean
 	@ConditionalOnMissingBean
 	public ReactorLoadBalancer<ServiceInstance> reactorServiceInstanceLoadBalancer(Environment environment,
@@ -66,6 +73,10 @@ public class LoadBalancerClientConfiguration {
 				loadBalancerClientFactory.getLazyProvider(name, ServiceInstanceListSupplier.class), name);
 	}
 
+	/**
+	 * 默认配置了多种策略的 ServiceInstanceListSupplier，都设置了 @ConditionalOnMissingBean 条件，从而保证只有一个会生效。
+	 * 可以通过设置属性 spring.cloud.loadbalancer.configurations 从而制定使用哪一种 ServiceInstanceListSupplier
+	 */
 	@Configuration(proxyBeanMethods = false)
 	@ConditionalOnReactiveDiscoveryEnabled
 	@Order(REACTIVE_SERVICE_INSTANCE_SUPPLIER_ORDER)
@@ -124,6 +135,9 @@ public class LoadBalancerClientConfiguration {
 
 	}
 
+	/**
+	 * 同上 {@link ReactiveSupportConfiguration}，只不过构造的是 堵塞式的 ServiceInstanceListSupplier
+	 */
 	@Configuration(proxyBeanMethods = false)
 	@ConditionalOnBlockingDiscoveryEnabled
 	@Order(REACTIVE_SERVICE_INSTANCE_SUPPLIER_ORDER + 1)
@@ -183,6 +197,9 @@ public class LoadBalancerClientConfiguration {
 
 	}
 
+	/**
+	 * 通过代理模式对 ServiceInstanceListSupplier 进行增强
+	 */
 	@Configuration(proxyBeanMethods = false)
 	@ConditionalOnBlockingDiscoveryEnabled
 	@ConditionalOnClass(RetryTemplate.class)
@@ -201,6 +218,9 @@ public class LoadBalancerClientConfiguration {
 
 	}
 
+	/**
+	 * 同上 {@link BlockingRetryConfiguration}
+	 */
 	@Configuration(proxyBeanMethods = false)
 	@ConditionalOnBlockingDiscoveryEnabled
 	@Conditional(ReactiveOnAvoidPreviousInstanceAndRetryEnabledCondition.class)

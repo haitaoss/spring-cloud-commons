@@ -16,14 +16,6 @@
 
 package org.springframework.cloud.bootstrap;
 
-import java.io.IOException;
-import java.lang.annotation.Annotation;
-import java.lang.reflect.AnnotatedElement;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-
 import org.springframework.context.EnvironmentAware;
 import org.springframework.context.annotation.DeferredImportSelector;
 import org.springframework.core.annotation.AnnotationAwareOrderComparator;
@@ -37,6 +29,14 @@ import org.springframework.core.type.classreading.MetadataReader;
 import org.springframework.core.type.classreading.MetadataReaderFactory;
 import org.springframework.util.StringUtils;
 
+import java.io.IOException;
+import java.lang.annotation.Annotation;
+import java.lang.reflect.AnnotatedElement;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+
 /**
  * This class uses {@link SpringFactoriesLoader} to load {@link BootstrapConfiguration}
  * entries from {@code spring.factories}. The classes are then loaded so they can be
@@ -48,93 +48,103 @@ import org.springframework.util.StringUtils;
  */
 public class BootstrapImportSelector implements EnvironmentAware, DeferredImportSelector {
 
-	private Environment environment;
+    private Environment environment;
 
-	private MetadataReaderFactory metadataReaderFactory = new CachingMetadataReaderFactory();
+    private MetadataReaderFactory metadataReaderFactory = new CachingMetadataReaderFactory();
 
-	@Override
-	public void setEnvironment(Environment environment) {
-		this.environment = environment;
-	}
+    @Override
+    public void setEnvironment(Environment environment) {
+        this.environment = environment;
+    }
 
-	@Override
-	public String[] selectImports(AnnotationMetadata annotationMetadata) {
-		ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
-		// Use names and ensure unique to protect against duplicates
-		List<String> names = new ArrayList<>(
-				SpringFactoriesLoader.loadFactoryNames(BootstrapConfiguration.class, classLoader));
-		names.addAll(Arrays.asList(StringUtils
-				.commaDelimitedListToStringArray(this.environment.getProperty("spring.cloud.bootstrap.sources", ""))));
+    @Override
+    public String[] selectImports(AnnotationMetadata annotationMetadata) {
+        ClassLoader classLoader = Thread.currentThread()
+                .getContextClassLoader();
+        /**
+         * 读取 META-INF/spring.factories 获取key为BootstrapConfiguration的值
+         * */
+        // Use names and ensure unique to protect against duplicates
+        List<String> names = new ArrayList<>(
+                SpringFactoriesLoader.loadFactoryNames(BootstrapConfiguration.class, classLoader));
+        // 追加这个属性的值
+        names.addAll(Arrays.asList(StringUtils.commaDelimitedListToStringArray(
+                this.environment.getProperty("spring.cloud.bootstrap.sources", ""))));
 
-		List<OrderedAnnotatedElement> elements = new ArrayList<>();
-		for (String name : names) {
-			try {
-				elements.add(new OrderedAnnotatedElement(this.metadataReaderFactory, name));
-			}
-			catch (IOException e) {
-				continue;
-			}
-		}
-		AnnotationAwareOrderComparator.sort(elements);
+        List<OrderedAnnotatedElement> elements = new ArrayList<>();
+        for (String name : names) {
+            try {
+                elements.add(new OrderedAnnotatedElement(this.metadataReaderFactory, name));
+            } catch (IOException e) {
+                continue;
+            }
+        }
+        // 排序
+        AnnotationAwareOrderComparator.sort(elements);
 
-		String[] classNames = elements.stream().map(e -> e.name).toArray(String[]::new);
+        String[] classNames = elements.stream()
+                .map(e -> e.name)
+                .toArray(String[]::new);
 
-		return classNames;
-	}
+        // 返回。返回值会作为配置类被解析，最终会注册到BeanFactory中
+        return classNames;
+    }
 
-	class OrderedAnnotatedElement implements AnnotatedElement {
+    class OrderedAnnotatedElement implements AnnotatedElement {
 
-		private final String name;
+        private final String name;
 
-		private Order order = null;
+        private Order order = null;
 
-		private Integer value;
+        private Integer value;
 
-		OrderedAnnotatedElement(MetadataReaderFactory metadataReaderFactory, String name) throws IOException {
-			MetadataReader metadataReader = metadataReaderFactory.getMetadataReader(name);
-			AnnotationMetadata metadata = metadataReader.getAnnotationMetadata();
-			Map<String, Object> attributes = metadata.getAnnotationAttributes(Order.class.getName());
-			this.name = name;
-			if (attributes != null && attributes.containsKey("value")) {
-				this.value = (Integer) attributes.get("value");
-				this.order = new Order() {
-					@Override
-					public Class<? extends Annotation> annotationType() {
-						return Order.class;
-					}
+        OrderedAnnotatedElement(MetadataReaderFactory metadataReaderFactory, String name) throws IOException {
+            MetadataReader metadataReader = metadataReaderFactory.getMetadataReader(name);
+            AnnotationMetadata metadata = metadataReader.getAnnotationMetadata();
+            Map<String, Object> attributes = metadata.getAnnotationAttributes(Order.class.getName());
+            this.name = name;
+            if (attributes != null && attributes.containsKey("value")) {
+                this.value = (Integer) attributes.get("value");
+                this.order = new Order() {
+                    @Override
+                    public Class<? extends Annotation> annotationType() {
+                        return Order.class;
+                    }
 
-					@Override
-					public int value() {
-						return OrderedAnnotatedElement.this.value;
-					}
-				};
-			}
-		}
+                    @Override
+                    public int value() {
+                        return OrderedAnnotatedElement.this.value;
+                    }
+                };
+            }
+        }
 
-		@Override
-		@SuppressWarnings("unchecked")
-		public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
-			if (annotationClass == Order.class) {
-				return (T) this.order;
-			}
-			return null;
-		}
+        @Override
+        @SuppressWarnings("unchecked")
+        public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
+            if (annotationClass == Order.class) {
+                return (T) this.order;
+            }
+            return null;
+        }
 
-		@Override
-		public Annotation[] getAnnotations() {
-			return this.order == null ? new Annotation[0] : new Annotation[] { this.order };
-		}
+        @Override
+        public Annotation[] getAnnotations() {
+            return this.order == null ? new Annotation[0] : new Annotation[]{this.order};
+        }
 
-		@Override
-		public Annotation[] getDeclaredAnnotations() {
-			return getAnnotations();
-		}
+        @Override
+        public Annotation[] getDeclaredAnnotations() {
+            return getAnnotations();
+        }
 
-		@Override
-		public String toString() {
-			return new ToStringCreator(this).append("name", this.name).append("value", this.value).toString();
-		}
+        @Override
+        public String toString() {
+            return new ToStringCreator(this).append("name", this.name)
+                    .append("value", this.value)
+                    .toString();
+        }
 
-	}
+    }
 
 }

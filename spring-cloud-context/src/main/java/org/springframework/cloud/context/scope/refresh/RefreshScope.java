@@ -16,8 +16,6 @@
 
 package org.springframework.cloud.context.scope.refresh;
 
-import java.io.Serializable;
-
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.beans.factory.support.BeanDefinitionRegistry;
@@ -29,6 +27,8 @@ import org.springframework.context.event.ContextRefreshedEvent;
 import org.springframework.core.Ordered;
 import org.springframework.jmx.export.annotation.ManagedOperation;
 import org.springframework.jmx.export.annotation.ManagedResource;
+
+import java.io.Serializable;
 
 /**
  * <p>
@@ -112,6 +112,11 @@ public class RefreshScope extends GenericScope
 	}
 
 	public void start(ContextRefreshedEvent event) {
+		/**
+		 * 其实就是对 scope 的bean进行初始化
+		 *
+		 * 比如 {@link RefreshScope#RefreshScope()}
+		 * */
 		if (event.getApplicationContext() == this.context && this.eager && this.registry != null) {
 			eagerlyInitialize();
 		}
@@ -120,6 +125,7 @@ public class RefreshScope extends GenericScope
 	private void eagerlyInitialize() {
 		for (String name : this.context.getBeanDefinitionNames()) {
 			BeanDefinition definition = this.registry.getBeanDefinition(name);
+			//  不是懒加载才初始化
 			if (this.getName().equals(definition.getScope()) && !definition.isLazyInit()) {
 				Object bean = this.context.getBean(name);
 				if (bean != null) {

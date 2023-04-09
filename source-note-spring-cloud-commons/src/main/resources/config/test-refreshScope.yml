@@ -1,0 +1,20 @@
+info:
+  name: info_name111
+  address: info_address111
+name: haitao111
+
+spring:
+  cloud:
+    # 配置 PropertySourceLocator 生成的 PropertySource 设置到 Environment 中的顺序
+    config:
+      overrideSystemProperties: true
+      allowOverride: true
+      overrideNone: false
+    refresh:
+      # 时候否启用 refresh 的自动配置类
+      enabled: true
+      # 下面两个的效果是等价的,让这些类变成 @RefreshScope 的 bean
+      refreshable: cn.A
+      extraRefreshable: cn.B
+      # 属性更新时，这些类不进行属性的重新绑定 (针对的是 @ConfigurationProperties)
+      never-refreshable: cn.C

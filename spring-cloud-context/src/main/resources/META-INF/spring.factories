@@ -1,16 +1,16 @@
-# AutoConfiguration
+# AutoConfiguration (SpringBoot\u542F\u52A8\u4F1A\u8BFB\u53D6\u8FD9\u4E9B\u503C\u4F5C\u4E3A\u914D\u7F6E\u7C7B\u6CE8\u518C\u5230BeanFactory\u4E2D)
 org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
 org.springframework.cloud.autoconfigure.ConfigurationPropertiesRebinderAutoConfiguration,\
 org.springframework.cloud.autoconfigure.LifecycleMvcEndpointAutoConfiguration,\
 org.springframework.cloud.autoconfigure.RefreshAutoConfiguration,\
 org.springframework.cloud.autoconfigure.RefreshEndpointAutoConfiguration,\
 org.springframework.cloud.autoconfigure.WritableEnvironmentEndpointAutoConfiguration
-# Application Listeners
+# Application Listeners (SpringBoot\u542F\u52A8\u751F\u547D\u5468\u671F\uFF0C\u4F1A\u53D1\u5E03\u4E8B\u4EF6\u7ED9\u8FD9\u4E9BListener\u3002\u800C BootstrapApplicationListener \u5C31\u662F\u7528\u4E8E\u5B8C\u6210 SpringCloud \u7684\u63A5\u5165)
 org.springframework.context.ApplicationListener=\
 org.springframework.cloud.bootstrap.BootstrapApplicationListener,\
 org.springframework.cloud.bootstrap.LoggingSystemShutdownListener,\
 org.springframework.cloud.context.restart.RestartListener
-# Spring Cloud Bootstrap components
+# Spring Cloud Bootstrap components (SpringCloud \u6784\u9020 bootstrap context \u65F6\u4F1A\u4F7F\u7528\u8FD9\u4E9B\u503C\u4F5C\u4E3A source \u4E5F\u5C31\u662F bootstrap\u7684\u521D\u59CB\u7C7B)
 org.springframework.cloud.bootstrap.BootstrapConfiguration=\
 org.springframework.cloud.bootstrap.config.PropertySourceBootstrapConfiguration,\
 org.springframework.cloud.bootstrap.encrypt.EncryptionBootstrapConfiguration,\

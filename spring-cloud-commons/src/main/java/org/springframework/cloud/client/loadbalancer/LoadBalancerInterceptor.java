@@ -16,14 +16,14 @@
 
 package org.springframework.cloud.client.loadbalancer;
 
-import java.io.IOException;
-import java.net.URI;
-
 import org.springframework.http.HttpRequest;
 import org.springframework.http.client.ClientHttpRequestExecution;
 import org.springframework.http.client.ClientHttpRequestInterceptor;
 import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.util.Assert;
+
+import java.io.IOException;
+import java.net.URI;
 
 /**
  * @author Spencer Gibb
@@ -51,8 +51,16 @@ public class LoadBalancerInterceptor implements ClientHttpRequestInterceptor {
 	public ClientHttpResponse intercept(final HttpRequest request, final byte[] body,
 			final ClientHttpRequestExecution execution) throws IOException {
 		final URI originalUri = request.getURI();
+		// 主机名就是host
 		String serviceName = originalUri.getHost();
 		Assert.state(serviceName != null, "Request URI does not contain a valid hostname: " + originalUri);
+		/**
+		 * 使用 LoadBalancerRequestFactory 构造出 LoadBalancerRequest，构造逻辑其实就是使用 LoadBalancerRequestTransformer 对 HttpRequest 进行增强
+		 * 然后委托给 LoadBalancerClient 执行请求
+		 *
+		 * 默认是这个实现类
+		 * {@link org.springframework.cloud.loadbalancer.blocking.client.BlockingLoadBalancerClient#execute(String, LoadBalancerRequest)}
+		 * */
 		return this.loadBalancer.execute(serviceName, this.requestFactory.createRequest(request, body, execution));
 	}
 

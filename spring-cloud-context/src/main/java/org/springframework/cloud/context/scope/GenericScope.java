@@ -16,27 +16,10 @@
 
 package org.springframework.cloud.context.scope;
 
-import java.lang.reflect.Method;
-import java.lang.reflect.UndeclaredThrowableException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
-
 import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-
 import org.springframework.aop.framework.Advised;
 import org.springframework.aop.scope.ScopedObject;
 import org.springframework.aop.scope.ScopedProxyFactoryBean;
@@ -60,6 +43,15 @@ import org.springframework.expression.spel.standard.SpelExpressionParser;
 import org.springframework.expression.spel.support.StandardEvaluationContext;
 import org.springframework.util.ReflectionUtils;
 import org.springframework.util.StringUtils;
+
+import java.lang.reflect.Method;
+import java.lang.reflect.UndeclaredThrowableException;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
  * <p>
@@ -135,6 +127,11 @@ public class GenericScope
 		Collection<BeanLifecycleWrapper> wrappers = this.cache.clear();
 		for (BeanLifecycleWrapper wrapper : wrappers) {
 			try {
+				/**
+				 * 上写锁，从而堵塞方法的执行
+				 *
+				 * {@link LockedScopedProxyFactoryBean#invoke(MethodInvocation)}
+				 * */
 				Lock lock = this.locks.get(wrapper.getName()).writeLock();
 				lock.lock();
 				try {
@@ -178,9 +175,16 @@ public class GenericScope
 
 	@Override
 	public Object get(String name, ObjectFactory<?> objectFactory) {
+		/**
+		 * 缓存起来。
+		 *
+		 * cache.put 是不存在才会设置，存在了就返回当前值
+		 * */
 		BeanLifecycleWrapper value = this.cache.put(name, new BeanLifecycleWrapper(name, objectFactory));
+		// 不存在在设置锁
 		this.locks.putIfAbsent(name, new ReentrantReadWriteLock());
 		try {
+			// 生成 bean 对象
 			return value.getBean();
 		}
 		catch (RuntimeException e) {
@@ -240,6 +244,7 @@ public class GenericScope
 	@Override
 	public void postProcessBeanFactory(ConfigurableListableBeanFactory beanFactory) throws BeansException {
 		this.beanFactory = beanFactory;
+		// 注册 scope
 		beanFactory.registerScope(this.name, this);
 		setSerializationId(beanFactory);
 	}
@@ -250,10 +255,22 @@ public class GenericScope
 			BeanDefinition definition = registry.getBeanDefinition(name);
 			if (definition instanceof RootBeanDefinition) {
 				RootBeanDefinition root = (RootBeanDefinition) definition;
+				/**
+				 * 是这个类型的 ScopedProxyFactoryBean beanClass 需要做处理
+				 *
+				 * TIps：若 @Scope(proxyMode = ScopedProxyMode.NO | ScopedProxyMode.DEFAULT) 不是，那么在处理这个bean
+				 * 		时会修改其 beanClass 为 ScopedProxyFactoryBean，而 @RefreshScope 就满足
+				 * */
 				if (root.getDecoratedDefinition() != null && root.hasBeanClass()
 						&& root.getBeanClass() == ScopedProxyFactoryBean.class) {
 					if (getName().equals(root.getDecoratedDefinition().getBeanDefinition().getScope())) {
+						/**
+						 * 修改 beanClass
+						 * 注：LockedScopedProxyFactoryBean 是用来生成代理对象的工具类，会默认添加一个 MethodInterceptor,该拦截器是先加 读锁 再执行方法，
+						 * 其目的是因为 RefreshScope 的刷新方法，会遍历域中的所有对象 获取其写锁，上锁之后在销毁bean，从而保证如果scope刷新时，方法的执行会被堵塞
+						 * */
 						root.setBeanClass(LockedScopedProxyFactoryBean.class);
+						// 设置构造器参数
 						root.getConstructorArgumentValues().addGenericArgumentValue(this);
 						// surprising that a scoped proxy bean definition is not already
 						// marked as synthetic?
@@ -455,6 +472,7 @@ public class GenericScope
 			Object proxy = getObject();
 			if (proxy instanceof Advised) {
 				Advised advised = (Advised) proxy;
+				// 扩展拦截器
 				advised.addAdvice(0, this);
 			}
 		}
@@ -481,6 +499,12 @@ public class GenericScope
 				}
 				readWriteLock = new ReentrantReadWriteLock();
 			}
+			/**
+			 * 方法的执行上读锁。
+			 *
+			 * 其目的是因为 RefreshScope 的刷新方法，会遍历域中的所有对象 获取其写锁，上锁之后在 回调销毁方法，从而保证如果scope刷新了，那么方法的执行会被堵塞
+			 * 		{@link GenericScope#destroy()}
+			 * */
 			Lock lock = readWriteLock.readLock();
 			lock.lock();
 			try {

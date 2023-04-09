@@ -16,20 +16,13 @@
 
 package org.springframework.cloud.loadbalancer.config;
 
-import javax.annotation.PostConstruct;
-
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.stoyanr.evictor.ConcurrentMapWithTimedEviction;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-
 import org.springframework.boot.autoconfigure.AutoConfigureAfter;
 import org.springframework.boot.autoconfigure.cache.CacheAutoConfiguration;
-import org.springframework.boot.autoconfigure.condition.AnyNestedCondition;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingClass;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.condition.*;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.caffeine.CaffeineCacheManager;
@@ -38,9 +31,12 @@ import org.springframework.cloud.loadbalancer.cache.CaffeineBasedLoadBalancerCac
 import org.springframework.cloud.loadbalancer.cache.DefaultLoadBalancerCacheManager;
 import org.springframework.cloud.loadbalancer.cache.LoadBalancerCacheManager;
 import org.springframework.cloud.loadbalancer.cache.LoadBalancerCacheProperties;
+import org.springframework.cloud.loadbalancer.core.ServiceInstanceListSupplierBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Conditional;
 import org.springframework.context.annotation.Configuration;
+
+import javax.annotation.PostConstruct;
 
 /**
  * An AutoConfiguration that automatically enables caching when when Spring Boot, and
@@ -53,6 +49,8 @@ import org.springframework.context.annotation.Configuration;
  * @see CacheAutoConfiguration
  * @see CacheAspectSupport
  * @see <a href="https://github.com/ben-manes/caffeine>Caffeine</a>
+ *
+ * 在 {@link ServiceInstanceListSupplierBuilder#withCaching()} 会用到 LoadBalancerCacheManager
  */
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnClass({ CacheManager.class, CacheAutoConfiguration.class })

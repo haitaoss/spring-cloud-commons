@@ -16,11 +16,6 @@
 
 package org.springframework.cloud.autoconfigure;
 
-import java.util.HashSet;
-import java.util.Set;
-
-import javax.annotation.PostConstruct;
-
 import org.springframework.aop.scope.ScopedProxyUtils;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.BeanFactory;
@@ -56,6 +51,10 @@ import org.springframework.core.env.StandardEnvironment;
 import org.springframework.instrument.classloading.LoadTimeWeaver;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
+
+import javax.annotation.PostConstruct;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Autoconfiguration for the refresh scope and associated features to do with changes in
@@ -173,11 +172,21 @@ public class RefreshAutoConfiguration {
 
 		@Override
 		public void postProcessBeanDefinitionRegistry(BeanDefinitionRegistry registry) throws BeansException {
+			/**
+			 * 获取属性值
+			 * 	spring.cloud.refresh.refreshable
+			 * 	spring.cloud.refresh.extraRefreshable
+			 * 绑定给 refreshables 属性
+			 * */
 			bindEnvironmentIfNeeded(registry);
 			for (String name : registry.getBeanDefinitionNames()) {
 				BeanDefinition definition = registry.getBeanDefinition(name);
+				/**
+				 * 类全名 包含在属性 refreshables 中就是true
+				 * */
 				if (isApplicable(registry, name, definition)) {
 					BeanDefinitionHolder holder = new BeanDefinitionHolder(definition, name);
+					// 设置 beanClass 为 ScopedProxyFactoryBean 类型
 					BeanDefinitionHolder proxy = ScopedProxyUtils.createScopedProxy(holder, registry, true);
 					definition.setScope("refresh");
 					if (registry.containsBeanDefinition(proxy.getBeanName())) {

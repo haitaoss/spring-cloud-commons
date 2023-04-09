@@ -49,6 +49,13 @@ import org.springframework.web.client.RestTemplate;
 @ConditionalOnClass(RestTemplate.class)
 public class BlockingLoadBalancerClientAutoConfiguration {
 
+	/**
+	 * LoadBalancerClient 是用来接收 HttpRequest 根据 Uri 得到 serviceId ，然后使用 serviceId 负载均衡得到唯一的 serviceInstance，
+	 * 然后再执行 HttpRequest
+	 * @param loadBalancerClientFactory
+	 * @param properties
+	 * @return
+	 */
 	@Bean
 	@ConditionalOnBean(LoadBalancerClientFactory.class)
 	@ConditionalOnMissingBean

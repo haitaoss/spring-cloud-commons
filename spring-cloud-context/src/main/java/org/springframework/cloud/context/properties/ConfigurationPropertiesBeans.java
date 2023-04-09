@@ -16,11 +16,6 @@
 
 package org.springframework.cloud.context.properties;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
@@ -28,6 +23,11 @@ import org.springframework.boot.context.properties.ConfigurationPropertiesBean;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
 import org.springframework.stereotype.Component;
+
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * Collects references to <code>@ConfigurationProperties</code> beans in the context and
@@ -58,11 +58,14 @@ public class ConfigurationPropertiesBeans implements BeanPostProcessor, Applicat
 		}
 		if (applicationContext.getParent() != null && applicationContext.getParent()
 				.getAutowireCapableBeanFactory() instanceof ConfigurableListableBeanFactory) {
+			// 父容器的 BeanFactory
 			ConfigurableListableBeanFactory listable = (ConfigurableListableBeanFactory) applicationContext.getParent()
 					.getAutowireCapableBeanFactory();
+			// 拿到 父容器 记录的信息
 			String[] names = listable.getBeanNamesForType(ConfigurationPropertiesBeans.class);
 			if (names.length == 1) {
 				this.parent = (ConfigurationPropertiesBeans) listable.getBean(names[0]);
+				// 将父容器的记录信息 扩展到当前类
 				this.beans.putAll(this.parent.beans);
 			}
 		}
@@ -70,12 +73,15 @@ public class ConfigurationPropertiesBeans implements BeanPostProcessor, Applicat
 
 	@Override
 	public Object postProcessBeforeInitialization(Object bean, String beanName) throws BeansException {
+		// 是 refreshScope 的bean 就不管
 		if (isRefreshScoped(beanName)) {
 			return bean;
 		}
+		// bean 有 @ConfigurationProperties 就不会返回 null
 		ConfigurationPropertiesBean propertiesBean = ConfigurationPropertiesBean.get(this.applicationContext, bean,
 				beanName);
 		if (propertiesBean != null) {
+			// 记录下来 有@ConfigurationProperties注解 标注的bean
 			this.beans.put(beanName, propertiesBean);
 		}
 		return bean;
@@ -95,6 +101,7 @@ public class ConfigurationPropertiesBeans implements BeanPostProcessor, Applicat
 		if (beanName == null || this.refreshScope == null) {
 			return false;
 		}
+		// 是 refreshScope 的bean
 		return this.beanFactory.containsBeanDefinition(beanName)
 				&& this.refreshScope.equals(this.beanFactory.getBeanDefinition(beanName).getScope());
 	}
