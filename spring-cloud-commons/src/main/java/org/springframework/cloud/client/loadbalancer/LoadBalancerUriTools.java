@@ -93,17 +93,22 @@ public final class LoadBalancerUriTools {
 	}
 
 	private static URI doReconstructURI(ServiceInstance serviceInstance, URI original) {
+		// 拿到主机名
 		String host = serviceInstance.getHost();
+		// 拿到协议名，缺失值就是用 original 的协议名
 		String scheme = Optional.ofNullable(serviceInstance.getScheme())
 				.orElse(computeScheme(original, serviceInstance));
+		// 拿到端口，缺省值会根据协议名得到 要么是80要么是443
 		int port = computePort(serviceInstance.getPort(), scheme);
 
+		// 三个值都一样，说明不需要替换
 		if (Objects.equals(host, original.getHost()) && port == original.getPort()
 				&& Objects.equals(scheme, original.getScheme())) {
 			return original;
 		}
 
 		boolean encoded = containsEncodedParts(original);
+		// 也就是只替换 schema、host和port。比如路径、查询参数是保留的
 		return UriComponentsBuilder.fromUri(original).scheme(scheme).host(host).port(port).build(encoded).toUri();
 	}
 

@@ -19,7 +19,6 @@ package org.springframework.cloud.client.loadbalancer;
 import org.springframework.http.HttpRequest;
 import org.springframework.http.client.ClientHttpRequestExecution;
 import org.springframework.http.client.ClientHttpResponse;
-import org.springframework.http.client.InterceptingClientHttpRequest;
 
 import java.util.List;
 
