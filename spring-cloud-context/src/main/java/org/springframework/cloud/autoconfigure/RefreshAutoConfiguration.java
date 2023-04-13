@@ -206,11 +206,21 @@ public class RefreshAutoConfiguration {
 
 		@Override
 		public void postProcessBeanDefinitionRegistry(BeanDefinitionRegistry registry) throws BeansException {
+			/**
+			 * 获取属性值
+			 * 	spring.cloud.refresh.refreshable
+			 * 	spring.cloud.refresh.extraRefreshable
+			 * 绑定给 refreshables 属性
+			 * */
 			bindEnvironmentIfNeeded(registry);
 			for (String name : registry.getBeanDefinitionNames()) {
 				BeanDefinition definition = registry.getBeanDefinition(name);
+				/**
+				 * 类全名 包含在属性 refreshables 中就是true
+				 * */
 				if (isApplicable(registry, name, definition)) {
 					BeanDefinitionHolder holder = new BeanDefinitionHolder(definition, name);
+					// 设置 beanClass 为 ScopedProxyFactoryBean 类型
 					BeanDefinitionHolder proxy = ScopedProxyUtils.createScopedProxy(holder, registry, true);
 					definition.setScope("refresh");
 					if (registry.containsBeanDefinition(proxy.getBeanName())) {

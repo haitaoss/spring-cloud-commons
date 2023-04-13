@@ -1,0 +1,2 @@
+org.springframework.context.ApplicationListener=cn.haitaoss.refresh.listener.EnvironmentChangeEventListener
+org.springframework.cloud.bootstrap.BootstrapConfiguration=cn.haitaoss.BootstrapProperties.BootstrapConfiguration.MyPropertySourceLocator

@@ -46,12 +46,18 @@ class BlockingLoadBalancerRequest implements HttpRequestLoadBalancerRequest<Clie
 
 	@Override
 	public ClientHttpResponse apply(ServiceInstance instance) throws Exception {
+		// 装饰一下，其目的是会根据 instance 生成 uri
 		HttpRequest serviceRequest = new ServiceRequestWrapper(clientHttpRequestData.request, instance, loadBalancer);
 		if (this.transformers != null) {
 			for (LoadBalancerRequestTransformer transformer : this.transformers) {
+				// 对请求进行加工
 				serviceRequest = transformer.transformRequest(serviceRequest, instance);
 			}
 		}
+		/**
+		 * 放行请求
+		 * {@link InterceptingClientHttpRequest.InterceptingRequestExecution#execute(HttpRequest, byte[])}
+		 */
 		return clientHttpRequestData.execution.execute(serviceRequest, clientHttpRequestData.body);
 	}
 

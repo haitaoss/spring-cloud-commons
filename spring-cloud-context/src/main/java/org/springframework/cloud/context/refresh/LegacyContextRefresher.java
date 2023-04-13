@@ -59,6 +59,7 @@ public class LegacyContextRefresher extends ContextRefresher {
 	/* For testing. */ ConfigurableApplicationContext addConfigFilesToEnvironment() {
 		ConfigurableApplicationContext capture = null;
 		try {
+			// new 一个新的 Environment
 			StandardEnvironment environment = copyEnvironment(getContext().getEnvironment());
 
 			Map<String, Object> map = new HashMap<>();
@@ -68,26 +69,35 @@ public class LegacyContextRefresher extends ContextRefresher {
 			map.put("spring.main.web-application-type", "NONE");
 			map.put(BOOTSTRAP_ENABLED_PROPERTY, Boolean.TRUE.toString());
 			environment.getPropertySources().addFirst(new MapPropertySource(REFRESH_ARGS_PROPERTY_SOURCE, map));
-
+			// 启动一个 SpringBoot 从而实现属性文件的重新加载
 			SpringApplicationBuilder builder = new SpringApplicationBuilder(Empty.class).bannerMode(Banner.Mode.OFF)
 					.web(WebApplicationType.NONE).environment(environment);
+			/**
+			 * BootstrapApplicationListener 是用来接收 ApplicationEnvironmentPreparedEvent 事件，然后完成 bootstrap.properties 属性的加载
+			 * BootstrapConfigFileApplicationListener 啥事没干，方法是空实现
+			 * */
 			// Just the listeners that affect the environment (e.g. excluding logging
 			// listener because it has side effects)
 			builder.application().setListeners(
 					Arrays.asList(new BootstrapApplicationListener(), new BootstrapConfigFileApplicationListener()));
-			capture = builder.run();
+			capture = builder.run(); // 启动
 			if (environment.getPropertySources().contains(REFRESH_ARGS_PROPERTY_SOURCE)) {
 				environment.getPropertySources().remove(REFRESH_ARGS_PROPERTY_SOURCE);
 			}
+			// 原来的 Environment
 			MutablePropertySources target = getContext().getEnvironment().getPropertySources();
 			String targetName = null;
+			// 遍历新的 environment
 			for (PropertySource<?> source : environment.getPropertySources()) {
 				String name = source.getName();
+				// 存在同名的
 				if (target.contains(name)) {
 					targetName = name;
 				}
+				// 不是这些的才需要 替换或者新加
 				if (!this.standardSources.contains(name)) {
 					if (target.contains(name)) {
+						// 将新的内容 替换调原来的
 						target.replace(name, source);
 					}
 					else {

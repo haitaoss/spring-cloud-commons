@@ -54,6 +54,7 @@ public abstract class SpringFactoryImportSelector<T>
 
 	@SuppressWarnings("unchecked")
 	protected SpringFactoryImportSelector() {
+		// 获取 SpringFactoryImportSelector 上泛型标注的类
 		this.annotationClass = (Class<T>) GenericTypeResolver.resolveTypeArgument(this.getClass(),
 				SpringFactoryImportSelector.class);
 	}
@@ -63,12 +64,16 @@ public abstract class SpringFactoryImportSelector<T>
 		if (!isEnabled()) {
 			return new String[0];
 		}
+		// 其实就是得有 注解
 		AnnotationAttributes attributes = AnnotationAttributes
 				.fromMap(metadata.getAnnotationAttributes(this.annotationClass.getName(), true));
 
 		Assert.notNull(attributes, "No " + getSimpleName() + " attributes found. Is " + metadata.getClassName()
 				+ " annotated with @" + getSimpleName() + "?");
 
+		/**
+		 * 读取 META-INF/spring.factories 中 key 是 annotationClass
+		 * */
 		// Find all possible auto configuration classes, filtering duplicates
 		List<String> factories = new ArrayList<>(new LinkedHashSet<>(
 				SpringFactoriesLoader.loadFactoryNames(this.annotationClass, this.beanClassLoader)));

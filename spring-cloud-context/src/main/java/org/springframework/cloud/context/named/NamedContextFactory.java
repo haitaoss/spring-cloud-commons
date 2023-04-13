@@ -134,6 +134,7 @@ public abstract class NamedContextFactory<C extends NamedContextFactory.Specific
 		}
 		if (this.configurations.containsKey(name)) {
 			for (Class<?> configuration : this.configurations.get(name).getConfiguration()) {
+				// 将配置类注册到context中
 				context.register(configuration);
 			}
 		}
@@ -144,7 +145,23 @@ public abstract class NamedContextFactory<C extends NamedContextFactory.Specific
 				}
 			}
 		}
+		/**
+		 * 固定注册这两个。
+		 *
+		 * 比如 {@link org.springframework.cloud.loadbalancer.support.LoadBalancerClientFactory} 的 defaultConfigType
+		 * 		是这个类型 {@link org.springframework.cloud.loadbalancer.annotation.LoadBalancerClientConfiguration}
+		 *
+		 * 		LoadBalancerClientConfiguration 其目的是注册了 ServiceInstanceListSupplier、ReactorLoadBalancer<ServiceInstance>
+		 * 		是用来实现负载均衡策略得到唯一的 ServiceInstance 的。而且都有 @ConditionalOnMissingBean 条件，若我们想自定义
+		 * 		可以设置 {@link NamedContextFactory#configurations} 属性 扩展配置类。
+		 *
+		 * 		可以使用 @LoadBalancerClient 或者直接注册 LoadBalancerClientSpecification 类型的bean到容器中，
+		 * 		看 {@link org.springframework.cloud.loadbalancer.config.LoadBalancerAutoConfiguration#loadBalancerClientFactory()}
+		 * */
 		context.register(PropertyPlaceholderAutoConfiguration.class, this.defaultConfigType);
+		/**
+		 * 设置一个属性
+		 * */
 		context.getEnvironment().getPropertySources().addFirst(new MapPropertySource(this.propertySourceName,
 				Collections.<String, Object>singletonMap(this.propertyName, name)));
 		if (this.parent != null) {

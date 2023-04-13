@@ -59,6 +59,11 @@ public class LoadBalancerClientConfigurationRegistrar implements ImportBeanDefin
 		if (attrs != null && attrs.containsKey("value")) {
 			AnnotationAttributes[] clients = (AnnotationAttributes[]) attrs.get("value");
 			for (AnnotationAttributes client : clients) {
+				/**
+				 * 映射成 LoadBalancerClientSpecification 注册到BeanFactory中，
+				 * LoadBalancerClientSpecification 的作用可以看 {@link NamedContextFactory#createContext(String)}
+				 * 简单来说就是将 client.get("configuration") 的值 注册给指定Name的IOC容器
+				 * */
 				registerClientConfiguration(registry, getClientName(client), client.get("configuration"));
 			}
 		}
@@ -70,11 +75,13 @@ public class LoadBalancerClientConfigurationRegistrar implements ImportBeanDefin
 			else {
 				name = "default." + metadata.getClassName();
 			}
+			// 同上
 			registerClientConfiguration(registry, name, attrs.get("defaultConfiguration"));
 		}
 		Map<String, Object> client = metadata.getAnnotationAttributes(LoadBalancerClient.class.getName(), true);
 		String name = getClientName(client);
 		if (name != null) {
+			// 同上
 			registerClientConfiguration(registry, name, client.get("configuration"));
 		}
 	}

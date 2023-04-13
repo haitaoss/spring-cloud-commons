@@ -130,6 +130,11 @@ public class GenericScope
 		Collection<BeanLifecycleWrapper> wrappers = this.cache.clear();
 		for (BeanLifecycleWrapper wrapper : wrappers) {
 			try {
+				/**
+				 * 上写锁，从而堵塞方法的执行
+				 *
+				 * {@link LockedScopedProxyFactoryBean#invoke(MethodInvocation)}
+				 * */
 				Lock lock = this.locks.get(wrapper.getName()).writeLock();
 				lock.lock();
 				try {
@@ -173,9 +178,16 @@ public class GenericScope
 
 	@Override
 	public Object get(String name, ObjectFactory<?> objectFactory) {
+		/**
+		 * 缓存起来。
+		 *
+		 * cache.put 是不存在才会设置，存在了就返回当前值
+		 * */
 		BeanLifecycleWrapper value = this.cache.put(name, new BeanLifecycleWrapper(name, objectFactory));
+		// 不存在在设置锁
 		this.locks.putIfAbsent(name, new ReentrantReadWriteLock());
 		try {
+			// 生成 bean 对象
 			return value.getBean();
 		}
 		catch (RuntimeException e) {
@@ -235,6 +247,7 @@ public class GenericScope
 	@Override
 	public void postProcessBeanFactory(ConfigurableListableBeanFactory beanFactory) throws BeansException {
 		this.beanFactory = beanFactory;
+		// 注册 scope
 		beanFactory.registerScope(this.name, this);
 		setSerializationId(beanFactory);
 	}
@@ -245,10 +258,22 @@ public class GenericScope
 			BeanDefinition definition = registry.getBeanDefinition(name);
 			if (definition instanceof RootBeanDefinition) {
 				RootBeanDefinition root = (RootBeanDefinition) definition;
+				/**
+				 * 是这个类型的 ScopedProxyFactoryBean beanClass 需要做处理
+				 *
+				 * TIps：若 @Scope(proxyMode = ScopedProxyMode.NO | ScopedProxyMode.DEFAULT) 不是，那么在处理这个bean
+				 * 		时会修改其 beanClass 为 ScopedProxyFactoryBean，而 @RefreshScope 就满足
+				 * */
 				if (root.getDecoratedDefinition() != null && root.hasBeanClass()
 						&& root.getBeanClass() == ScopedProxyFactoryBean.class) {
 					if (getName().equals(root.getDecoratedDefinition().getBeanDefinition().getScope())) {
+						/**
+						 * 修改 beanClass
+						 * 注：LockedScopedProxyFactoryBean 是用来生成代理对象的工具类，会默认添加一个 MethodInterceptor,该拦截器是先加 读锁 再执行方法，
+						 * 其目的是因为 RefreshScope 的刷新方法，会遍历域中的所有对象 获取其写锁，上锁之后在销毁bean，从而保证如果scope刷新时，方法的执行会被堵塞
+						 * */
 						root.setBeanClass(LockedScopedProxyFactoryBean.class);
+						// 设置构造器参数
 						root.getConstructorArgumentValues().addGenericArgumentValue(this);
 						// surprising that a scoped proxy bean definition is not already
 						// marked as synthetic?
@@ -450,6 +475,7 @@ public class GenericScope
 			Object proxy = getObject();
 			if (proxy instanceof Advised) {
 				Advised advised = (Advised) proxy;
+				// 扩展拦截器
 				advised.addAdvice(0, this);
 			}
 		}
@@ -476,6 +502,12 @@ public class GenericScope
 				}
 				readWriteLock = new ReentrantReadWriteLock();
 			}
+			/**
+			 * 方法的执行上读锁。
+			 *
+			 * 其目的是因为 RefreshScope 的刷新方法，会遍历域中的所有对象 获取其写锁，上锁之后在 回调销毁方法，从而保证如果scope刷新了，那么方法的执行会被堵塞
+			 * 		{@link GenericScope#destroy()}
+			 * */
 			Lock lock = readWriteLock.readLock();
 			lock.lock();
 			try {

@@ -91,15 +91,26 @@ public abstract class ContextRefresher {
 	}
 
 	public synchronized Set<String> refresh() {
+		/**
+		 * 刷新 Environment。更新原理是 重新启动一个SpringBoot 从而实现属性文件的加载，然后将新生成 PropertySource 替换或者追加到 当前context的Environment中
+		 * 更新完会发布 EnvironmentChangeEvent 事件
+		 * */
 		Set<String> keys = refreshEnvironment();
+		/**
+		 * 刷新 refresh Scope 中的bean，其实就是情况作用域中的bean，然后会发布 RefreshScopeRefreshedEvent 事件
+		 * */
 		this.scope.refreshAll();
 		return keys;
 	}
 
 	public synchronized Set<String> refreshEnvironment() {
+		// 记录当前的
 		Map<String, Object> before = extract(this.context.getEnvironment().getPropertySources());
+		// 更新
 		updateEnvironment();
+		// 比较有哪些发生了变化
 		Set<String> keys = changes(before, extract(this.context.getEnvironment().getPropertySources())).keySet();
+		// 发布事件
 		this.context.publishEvent(new EnvironmentChangeEvent(this.context, keys));
 		return keys;
 	}

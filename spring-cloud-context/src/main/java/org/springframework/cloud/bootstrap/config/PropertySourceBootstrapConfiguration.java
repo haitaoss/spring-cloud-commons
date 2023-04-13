@@ -88,10 +88,16 @@ public class PropertySourceBootstrapConfiguration
 	@Override
 	public void initialize(ConfigurableApplicationContext applicationContext) {
 		List<PropertySource<?>> composite = new ArrayList<>();
+		// 排序
 		AnnotationAwareOrderComparator.sort(this.propertySourceLocators);
 		boolean empty = true;
 		ConfigurableEnvironment environment = applicationContext.getEnvironment();
 		for (PropertySourceLocator locator : this.propertySourceLocators) {
+			/**
+			 * 回调接口方法得到 source 。后面的代码就是根据策略决定，新得到 source 是放到前面还是后面，从而决定属性的加载顺序。
+			 *
+			 * 同名的 PropertySource 重复添加，会先删除在添加。看 {@link MutablePropertySources#addFirst(PropertySource)}
+			 */
 			Collection<PropertySource<?>> source = locator.locateCollection(environment);
 			if (source == null || source.size() == 0) {
 				continue;
@@ -110,18 +116,33 @@ public class PropertySourceBootstrapConfiguration
 			composite.addAll(sourceList);
 			empty = false;
 		}
+		// 不为空
 		if (!empty) {
 			MutablePropertySources propertySources = environment.getPropertySources();
 			String logConfig = environment.resolvePlaceholders("${logging.config:}");
 			LogFile logFile = LogFile.get(environment);
 			for (PropertySource<?> p : environment.getPropertySources()) {
+				// 移除以 bootstrap.properties 开头的
 				if (p.getName().startsWith(BOOTSTRAP_PROPERTY_SOURCE_NAME)) {
 					propertySources.remove(p.getName());
 				}
 			}
+			/**
+			 * {@link PropertySourceBootstrapProperties}
+			 * 根据
+			 *      spring.cloud.config.overrideSystemProperties
+			 *      spring.cloud.config.allowOverride
+			 *      spring.cloud.config.overrideNone
+			 *
+			 * 的属性值，决定以什么方式将 composite 中的内容添加到 propertySources 中
+			 * */
 			insertPropertySources(propertySources, composite);
+			// 日志相关的
 			reinitializeLoggingSystem(environment, logConfig, logFile);
 			setLogLevels(applicationContext, environment);
+			/**
+			 * 若新的属性文件设置了新的 spring.profiles.include 那就添加到 environment.setActiveProfiles
+			 * */
 			handleIncludedProfiles(environment);
 		}
 	}
@@ -168,34 +189,47 @@ public class PropertySourceBootstrapConfiguration
 			incoming.addFirst(p);
 		}
 		PropertySourceBootstrapProperties remoteProperties = new PropertySourceBootstrapProperties();
+		// 映射 incoming 的值到 remoteProperties 中（也就是绑定属性）
 		Binder.get(environment(incoming)).bind("spring.cloud.config", Bindable.ofInstance(remoteProperties));
+		/**
+		 * 不允许覆盖 或者 (不设置覆盖行为 && 覆盖系统属性) 就放到前面
+		 *
+		 * 注：isAllowOverride 指的是 是否允许现有的属性信息覆盖 新加的
+		 */
 		if (!remoteProperties.isAllowOverride()
 				|| (!remoteProperties.isOverrideNone() && remoteProperties.isOverrideSystemProperties())) {
 			for (PropertySource<?> p : reversedComposite) {
+				// 放到前面，也就是会先读到，所以可以理解成覆盖
 				propertySources.addFirst(p);
 			}
 			return;
 		}
+		// 不覆盖
 		if (remoteProperties.isOverrideNone()) {
 			for (PropertySource<?> p : composite) {
+				// 放到后面
 				propertySources.addLast(p);
 			}
 			return;
 		}
 		if (propertySources.contains(SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME)) {
+			// 不覆盖系统属性
 			if (!remoteProperties.isOverrideSystemProperties()) {
 				for (PropertySource<?> p : reversedComposite) {
+					// 放到系统属性的后面
 					propertySources.addAfter(SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME, p);
 				}
 			}
 			else {
 				for (PropertySource<?> p : composite) {
+					// 放到前面，也就是覆盖
 					propertySources.addBefore(SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME, p);
 				}
 			}
 		}
 		else {
 			for (PropertySource<?> p : composite) {
+				// 放到后面
 				propertySources.addLast(p);
 			}
 		}
@@ -211,13 +245,16 @@ public class PropertySourceBootstrapConfiguration
 	}
 
 	private void handleIncludedProfiles(ConfigurableEnvironment environment) {
+		// 记录 spring.profiles.include 的值
 		Set<String> includeProfiles = new TreeSet<>();
 		for (PropertySource<?> propertySource : environment.getPropertySources()) {
 			addIncludedProfilesTo(includeProfiles, propertySource);
 		}
+		// 记录 spring.profiles.active 的值
 		List<String> activeProfiles = new ArrayList<>();
 		Collections.addAll(activeProfiles, environment.getActiveProfiles());
 
+		// 移除
 		// If it's already accepted we assume the order was set intentionally
 		includeProfiles.removeAll(activeProfiles);
 		if (includeProfiles.isEmpty()) {
@@ -227,6 +264,7 @@ public class PropertySourceBootstrapConfiguration
 		for (String profile : includeProfiles) {
 			activeProfiles.add(0, profile);
 		}
+		// 也就是 include + active 的值
 		environment.setActiveProfiles(activeProfiles.toArray(new String[activeProfiles.size()]));
 	}
 

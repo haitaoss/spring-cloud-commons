@@ -86,10 +86,22 @@ public class RetryLoadBalancerInterceptor implements ClientHttpRequestIntercepto
 		final URI originalUri = request.getURI();
 		final String serviceName = originalUri.getHost();
 		Assert.state(serviceName != null, "Request URI does not contain a valid hostname: " + originalUri);
+		/**
+		 * 使用 LoadBalancedRetryFactory 生成重试策略（默认是根据配置信息）
+		 * 	spring.cloud.loadbalancer.retry.maxRetriesOnSameServiceInstance -指示应在同一 ServiceInstance 上重试请求的次数（对每个选定实例单独计数）
+		 * 	spring.cloud.loadbalancer.retry.maxRetriesOnNextServiceInstance -指示新选择的 ServiceInstance 应重试请求的次数
+		 * 	spring.cloud.loadbalancer.retry.retryableStatusCodes -总是重试失败请求的状态代码
+		 * 	spring.cloud.loadbalancer.retry.backoff.minBackoff -设置最小回退持续时间（默认为5毫秒）
+		 * 	spring.cloud.loadbalancer.retry.backoff.maxBackoff -设置最大回退持续时间（默认为最大长值毫秒）
+		 * 	spring.cloud.loadbalancer.retry.backoff.jitter -设置用于计算每个调用的实际回退持续时间的抖动（默认为0.5）
+		 * */
 		final LoadBalancedRetryPolicy retryPolicy = lbRetryFactory.createRetryPolicy(serviceName, loadBalancer);
+		// 构造出 RetryTemplate
 		RetryTemplate template = createRetryTemplate(serviceName, request, retryPolicy);
+		// 使用 RetryTemplate 执行
 		return template.execute(context -> {
 			ServiceInstance serviceInstance = null;
+			// 重试的情况会有
 			if (context instanceof LoadBalancedRetryContext) {
 				LoadBalancedRetryContext lbContext = (LoadBalancedRetryContext) context;
 				serviceInstance = lbContext.getServiceInstance();
@@ -98,11 +110,14 @@ public class RetryLoadBalancerInterceptor implements ClientHttpRequestIntercepto
 							serviceInstance));
 				}
 			}
+			// 从 loadBalancerClientFactory 中获取 LoadBalancerLifecycle 类型的bean
 			Set<LoadBalancerLifecycle> supportedLifecycleProcessors = LoadBalancerLifecycleValidator
 					.getSupportedLifecycleProcessors(
 							loadBalancerFactory.getInstances(serviceName, LoadBalancerLifecycle.class),
 							RetryableRequestContext.class, ResponseData.class, ServiceInstance.class);
+			// 根据 serviceId 获取配置的 hint 值，默认是 default
 			String hint = getHint(serviceName);
+			// 为空，说明可能是第一次，那就通过 loadBalancer 得到 serviceInstance
 			if (serviceInstance == null) {
 				if (LOG.isDebugEnabled()) {
 					LOG.debug("Service instance retrieved from LoadBalancedRetryContext: was null. "
@@ -115,17 +130,21 @@ public class RetryLoadBalancerInterceptor implements ClientHttpRequestIntercepto
 				}
 				DefaultRequest<RetryableRequestContext> lbRequest = new DefaultRequest<>(
 						new RetryableRequestContext(previousServiceInstance, new RequestData(request), hint));
+				// 回调 LoadBalancerLifecycle#onStart 生命周期方法
 				supportedLifecycleProcessors.forEach(lifecycle -> lifecycle.onStart(lbRequest));
+				// 通过负载均衡策略选择出唯一的 serviceInstance
 				serviceInstance = loadBalancer.choose(serviceName, lbRequest);
 				if (LOG.isDebugEnabled()) {
 					LOG.debug(String.format("Selected service instance: %s", serviceInstance));
 				}
 				if (context instanceof LoadBalancedRetryContext) {
 					LoadBalancedRetryContext lbContext = (LoadBalancedRetryContext) context;
+					// 记录到 lbContext 中
 					lbContext.setServiceInstance(serviceInstance);
 				}
 				Response<ServiceInstance> lbResponse = new DefaultResponse(serviceInstance);
 				if (serviceInstance == null) {
+					// 回调 LoadBalancerLifecycle#onComplete 生命周期方法
 					supportedLifecycleProcessors.forEach(lifecycle -> lifecycle
 							.onComplete(new CompletionContext<ResponseData, ServiceInstance, RetryableRequestContext>(
 									CompletionContext.Status.DISCARD,
@@ -138,8 +157,11 @@ public class RetryLoadBalancerInterceptor implements ClientHttpRequestIntercepto
 					requestFactory.createRequest(request, body, execution),
 					new RetryableRequestContext(null, new RequestData(request), hint));
 			ServiceInstance finalServiceInstance = serviceInstance;
+
+			// 执行请求
 			ClientHttpResponse response = RetryLoadBalancerInterceptor.this.loadBalancer.execute(serviceName,
 					finalServiceInstance, lbRequest);
+
 			int statusCode = response.getRawStatusCode();
 			if (retryPolicy != null && retryPolicy.retryableStatusCode(statusCode)) {
 				if (LOG.isDebugEnabled()) {
@@ -164,11 +186,14 @@ public class RetryLoadBalancerInterceptor implements ClientHttpRequestIntercepto
 	private RetryTemplate createRetryTemplate(String serviceName, HttpRequest request,
 			LoadBalancedRetryPolicy retryPolicy) {
 		RetryTemplate template = new RetryTemplate();
+		// 使用 lbRetryFactory 生成重试策略
 		BackOffPolicy backOffPolicy = lbRetryFactory.createBackOffPolicy(serviceName);
 		template.setBackOffPolicy(backOffPolicy == null ? new NoBackOffPolicy() : backOffPolicy);
 		template.setThrowLastExceptionOnExhausted(true);
+		// 使用 lbRetryFactory 生成重试监听器
 		RetryListener[] retryListeners = lbRetryFactory.createRetryListeners(serviceName);
 		if (retryListeners != null && retryListeners.length != 0) {
+			// 设置给 template
 			template.setListeners(retryListeners);
 		}
 		template.setRetryPolicy(

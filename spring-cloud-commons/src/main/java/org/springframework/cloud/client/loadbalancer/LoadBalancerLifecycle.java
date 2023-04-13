@@ -18,7 +18,7 @@ package org.springframework.cloud.client.loadbalancer;
 
 /**
  * Allows to define actions that should be carried out before and after load-balancing.
- *
+ *  RC 表示 RequestContext 类型， RES 表示客户端响应类型， T 表示返回的服务器类型。
  * @author Olga Maciaszek-Sharma
  */
 public interface LoadBalancerLifecycle<RC, RES, T> {

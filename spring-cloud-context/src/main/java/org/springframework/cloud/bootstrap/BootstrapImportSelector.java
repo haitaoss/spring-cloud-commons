@@ -60,9 +60,13 @@ public class BootstrapImportSelector implements EnvironmentAware, DeferredImport
 	@Override
 	public String[] selectImports(AnnotationMetadata annotationMetadata) {
 		ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+		/**
+		 * 读取 META-INF/spring.factories 获取key为BootstrapConfiguration的值
+		 */
 		// Use names and ensure unique to protect against duplicates
 		List<String> names = new ArrayList<>(
 				SpringFactoriesLoader.loadFactoryNames(BootstrapConfiguration.class, classLoader));
+		// 追加这个属性的值
 		names.addAll(Arrays.asList(StringUtils
 				.commaDelimitedListToStringArray(this.environment.getProperty("spring.cloud.bootstrap.sources", ""))));
 
@@ -75,10 +79,12 @@ public class BootstrapImportSelector implements EnvironmentAware, DeferredImport
 				continue;
 			}
 		}
+		// 排序
 		AnnotationAwareOrderComparator.sort(elements);
 
 		String[] classNames = elements.stream().map(e -> e.name).toArray(String[]::new);
 
+		// 返回。返回值会作为配置类被解析，最终会注册到BeanFactory中
 		return classNames;
 	}
 

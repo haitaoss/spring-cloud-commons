@@ -67,6 +67,7 @@ public class LoadBalancerAutoConfiguration {
 		return () -> restTemplateCustomizers.ifAvailable(customizers -> {
 			for (RestTemplate restTemplate : LoadBalancerAutoConfiguration.this.restTemplates) {
 				for (RestTemplateCustomizer customizer : customizers) {
+					// 对 restTemplate 进行加工
 					customizer.customize(restTemplate);
 				}
 			}

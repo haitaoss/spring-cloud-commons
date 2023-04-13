@@ -1,0 +1,28 @@
+# 当前应用的名称
+spring:
+  application:
+    name: application
+  cloud:
+    discovery:
+      client:
+        simple:
+          instances:
+            s1:
+              - uri: http://localhost:8081
+              - uri: http://localhost:8082
+            s2:
+              - uri: http://localhost:8081
+              - uri: http://localhost:8082
+            s3:
+              - uri: http://localhost:8081
+              - uri: http://localhost:8082
+    loadbalancer:
+
+      # 设置使用哪种 ServiceInstanceListSupplier
+      configurations: default
+
+      # 再执行负载均衡请求时，会将提示信息设置到RequestContext中，我们可以灵活使用，比如用来配置一个 HintBasedServiceInstanceListSupplier
+      hint:
+        s1: s1
+        s2: s2
+

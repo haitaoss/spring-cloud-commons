@@ -53,6 +53,8 @@ import org.springframework.context.annotation.Configuration;
  * @see CacheAutoConfiguration
  * @see CacheAspectSupport
  * @see <a href="https://github.com/ben-manes/caffeine>Caffeine</a>
+ *
+ * 在 {@link ServiceInstanceListSupplierBuilder#withCaching()} 会用到 LoadBalancerCacheManager
  */
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnClass({ CacheManager.class, CacheAutoConfiguration.class })

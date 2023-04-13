@@ -25,6 +25,8 @@ import org.springframework.aop.scope.ScopedProxyUtils;
 import org.springframework.aop.support.AopUtils;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.BeanFactoryUtils;
+import org.springframework.beans.factory.DisposableBean;
+import org.springframework.beans.factory.config.DestructionAwareBeanPostProcessor;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.cloud.context.environment.EnvironmentChangeEvent;
@@ -88,6 +90,11 @@ public class ConfigurationPropertiesRebinder
 
 	@ManagedOperation
 	public boolean rebind(String name) {
+		/**
+		 * 不包含，就不bind。
+		 *
+		 * 注：beans 记录的是标注了 @ConfigurationProperties 的bean
+		 */
 		if (!this.beans.getBeanNames().contains(name)) {
 			return false;
 		}
@@ -125,16 +132,34 @@ public class ConfigurationPropertiesRebinder
 		try {
 			Object bean = appContext.getBean(name);
 			if (AopUtils.isAopProxy(bean)) {
+				// 获取实际被代理对象
 				bean = ProxyUtils.getTargetObject(bean);
 			}
 			if (bean != null) {
+				/**
+				 * 是这个属性记录的类就不要刷新 spring.cloud.refresh.never-refreshable
+				 */
 				// TODO: determine a more general approach to fix this.
 				// see
 				// https://github.com/spring-cloud/spring-cloud-commons/issues/571
 				if (getNeverRefreshable().contains(bean.getClass().getName())) {
 					return false; // ignore
 				}
+				/**
+				 * 并不是从 BeanFactory 中删除，只是回调特定接口方法而已
+				 *
+				 * 1. 遍历 DestructionAwareBeanPostProcessor 回调其方法
+				 * 		{@link DestructionAwareBeanPostProcessor#postProcessBeforeDestruction(Object, String)}
+				 * 2. 若是 DisposableBean 类型的bean，就回调其接口方法
+				 * 		{@link DisposableBean#destroy()}
+				 * */
 				appContext.getAutowireCapableBeanFactory().destroyBean(bean);
+				/**
+				 * 使用 BeanFactory 对bean进行初始化，而 @ConfigurationProperties bean的属性重新绑定是通过
+				 * ConfigurationPropertiesBindingPostProcessor 来实现的
+				 *
+				 * 注：ConfigurationPropertiesBindingPostProcessor 是 SpringBoot 自动装配注入的后置处理器
+				 * */
 				appContext.getAutowireCapableBeanFactory().initializeBean(bean, name);
 				return true;
 			}
@@ -167,6 +192,7 @@ public class ConfigurationPropertiesRebinder
 		if (this.applicationContext.equals(event.getSource())
 				// Backwards compatible
 				|| event.getKeys().equals(event.getSource())) {
+			// 重新绑定，其实就是 回调bean的销毁方法，然后对bean重新初始化而已
 			rebind();
 		}
 	}
